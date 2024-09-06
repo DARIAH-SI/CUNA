@@ -35,7 +35,7 @@ args_parser.add_argument("--model_params", nargs='*', choices = ['VAD', 'DIS', '
 args_parser.add_argument("--model_size", default="tiny", choices = ['tiny', 'base', 'small', 'medium', 'large'],  help="Whisper model size.")
 args_parser.add_argument("--model_device", default="cpu", choices = ['cpu', 'cuda'],  help="Device")
 
-args_parser.add_argument("--merge", action='store_true', help="Merge host and guest results.")
+args_parser.add_argument("--merge", type=str, help="Merge host and guest results.")
 args_parser.add_argument("--srt", action='store_true', help="Result to srt.")
 args_parser.add_argument("--tsv", action='store_true', help="Result to tsv - word and segments alignment.")
 
@@ -82,6 +82,7 @@ def main(args):
       with open(stt[r1].get_dump_path(), 'w') as file:
         json.dump(stt[r1].get_result(), file, indent=4)
     stt['merged'] = stt['host'] + stt['guest']
+    stt['merged'].set_name(args.merge)
     with open(stt['merged'].get_dump_path(), 'w') as file:
       json.dump(stt['merged'].get_result(), file, indent=4)
 

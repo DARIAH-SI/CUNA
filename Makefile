@@ -118,7 +118,8 @@ $(recognize-double_NN): recognize-double-%:
 	                               --model_device "$(MODEL_DEVICE)"  \
 	                               --recognize whisper  \
 	                               --model_params VAD DIS accurate  \
-	                               --merge --srt --tsv
+	                               --merge CUNA_$*\
+	                               --srt --tsv
 
 slurm-recognize-NN = $(addprefix slurm-recognize-, $(DOC_IDS))
 slurm-recognize: $(slurm-recognize-NN)

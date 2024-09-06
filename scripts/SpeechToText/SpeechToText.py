@@ -42,8 +42,7 @@ class SpeechToText:
     if not(host.volumes and guest.volumes):
       raise Exception('imposible to merge recognized tracks! Missing volumes values.')
     ret = type(host)(instance = host)
-    ret.name += '-' + guest.name
-    ret.name += '-' + guest.role
+    ret.name = ''
     ret.volumes = True
     print("TODO merge info !!!")
     for k in ret.info:
@@ -59,6 +58,9 @@ class SpeechToText:
 
   def get_name(self):
     return self.name
+
+  def set_name(self, name):
+    self.name = name
 
   def get_info(self):
     return self.info
