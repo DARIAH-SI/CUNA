@@ -85,11 +85,15 @@ $(DATADIR)audio-crop-beep-cropped.tsv:
 recognize-NN = $(addprefix recognize-, $(DOC_IDS))
 
 recognize: $(recognize-NN)
-$(recognize-NN): recognize-%: $(DATADIR)/recognize/CUNA_%
+$(recognize-NN): recognize-%: $(DATADIR)/recognize-working/CUNA_%
+	mkdir -p "$(DATADIR)/recognize-working/" || :
 	test -f $(DATADIR)/audio/CUNA_$*.guest.wav && make recognize-double-$* || :
 	test -f $(DATADIR)/audio/CUNA_$*.wav && make recognize-single-$* || :
+	mkdir -p "$(DATADIR)/recognize/"
+	cat "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.whisper.segments.tsv" \
+	  | sed '1 s@\(.*\t\)@\1<uk host topic000 text>@' > $(DATADIR)/recognize/CUNA_$*.tsv
 
-recognize-dir-NN = $(addprefix $(DATADIR)/recognize/CUNA_, $(DOC_IDS))
+recognize-dir-NN = $(addprefix $(DATADIR)/recognize-working/CUNA_, $(DOC_IDS))
 
 $(recognize-dir-NN): %:
 	mkdir -p $*
@@ -98,8 +102,8 @@ $(recognize-dir-NN): %:
 recognize-single_NN = $(addprefix recognize-single-, $(DOC_IDS))
 $(recognize-single_NN): recognize-single-%:
 	echo "INFO $*: recognize without annotating speaker"
-	ln -s "../../audio/CUNA_$*.wav" "$(DATADIR)/recognize/CUNA_$*/CUNA_$*.wav"
-	$(BIN)/python ./scripts/asr.py --dir "$(DATADIR)/recognize/CUNA_$*" \
+	ln -s "../../audio/CUNA_$*.wav" "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.wav"
+	$(BIN)/python ./scripts/asr.py --dir "$(DATADIR)/recognize-working/CUNA_$*" \
 	                               --speaker CUNA_$* \
 	                               --model_size "$(MODEL_SIZE)"  \
 	                               --model_device "$(MODEL_DEVICE)"  \
@@ -110,8 +114,8 @@ $(recognize-single_NN): recognize-single-%:
 recognize-double_NN = $(addprefix recognize-double-, $(DOC_IDS))
 $(recognize-double_NN): recognize-double-%:
 	echo "INFO $*: recognize host and guest and merge result"
-	for t in 'host' 'guest'; do ln -s "../../audio/CUNA_$*.$${t}.wav" "$(DATADIR)/recognize/CUNA_$*/CUNA_$*.$${t}.wav" ; done
-	$(BIN)/python ./scripts/asr.py --dir "$(DATADIR)/recognize/CUNA_$*" \
+	for t in 'host' 'guest'; do ln -s "../../audio/CUNA_$*.$${t}.wav" "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.$${t}.wav" ; done
+	$(BIN)/python ./scripts/asr.py --dir "$(DATADIR)/recognize-working/CUNA_$*" \
 	                               --host CUNA_$*.host  \
 	                               --guest CUNA_$*.guest  \
 	                               --model_size "$(MODEL_SIZE)"  \
@@ -133,7 +137,12 @@ $(slurm-recognize-NN): slurm-recognize-%:
 	echo '#SBATCH -q low' >> sbatch/CUNA$*
 	echo '#SBATCH --mem=64G' >> sbatch/CUNA$*
 	echo '#SBATCH --gres=gpu:1' >> sbatch/CUNA$*
-	echo 'make recognize-$* MODEL_SIZE=large MODEL_DEVICE=cuda' >> sbatch/CUNA$*
+	echo 'echo -e "$$(date +"%Y-%m-%dT%T")\tSTARTED\t$$SLURM_JOB_ID\t$$(hostname)\t--\t--" >> logs/CUNA.slurm.log' >> sbatch/CUNA$*
+	echo '/usr/bin/time --output=logs/CUNA.slurm.$$SLURM_JOB_ID.tmp -f "%x\t%E real, %U user, %S sys, %M kB"make recognize-$* MODEL_SIZE=large MODEL_DEVICE=cuda' >> sbatch/CUNA$*
+	echo 'TIME=$$(cut -f 2 logs/CUNA.slurm.$$SLURM_JOB_ID.tmp)' >> sbatch/CUNA$*
+	echo 'CODE=$$(cut -f 1 logs/CUNA.slurm.$$SLURM_JOB_ID.tmp)' >> sbatch/CUNA$*
+	echo 'rm logs/CUNA.slurm.$$SLURM_JOB_ID.tmp' >> sbatch/CUNA$*
+	echo 'echo -e "$$(date +"%Y-%m-%dT%T")\t$$( [ "$$CODE" -gt "0" ] && echo "FAILED-$$CODE" || echo "FINISHED" )\t$$SLURM_JOB_ID\t$$(hostname)\t$$TIME\t--" >> logs/CUNA.slurm.log' >> sbatch/CUNA$*
 	sbatch sbatch/CUNA$*
 
 # DEV-ASR
