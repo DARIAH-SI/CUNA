@@ -138,7 +138,7 @@ $(slurm-recognize-NN): slurm-recognize-%:
 	echo '#SBATCH --mem=64G' >> sbatch/CUNA$*
 	echo '#SBATCH --gres=gpu:1' >> sbatch/CUNA$*
 	echo 'echo -e "$$(date +"%Y-%m-%dT%T")\tSTARTED\t$$SLURM_JOB_ID\t$$(hostname)\t--\t--" >> logs/CUNA.slurm.log' >> sbatch/CUNA$*
-	echo '/usr/bin/time --output=logs/CUNA.slurm.$$SLURM_JOB_ID.tmp -f "%x\t%E real, %U user, %S sys, %M kB"make recognize-$* MODEL_SIZE=large MODEL_DEVICE=cuda' >> sbatch/CUNA$*
+	echo '/usr/bin/time --output=logs/CUNA.slurm.$$SLURM_JOB_ID.tmp -f "%x\t%E real, %U user, %S sys, %M kB" make recognize-$* MODEL_SIZE=large MODEL_DEVICE=cuda' >> sbatch/CUNA$*
 	echo 'TIME=$$(cut -f 2 logs/CUNA.slurm.$$SLURM_JOB_ID.tmp)' >> sbatch/CUNA$*
 	echo 'CODE=$$(cut -f 1 logs/CUNA.slurm.$$SLURM_JOB_ID.tmp)' >> sbatch/CUNA$*
 	echo 'rm logs/CUNA.slurm.$$SLURM_JOB_ID.tmp' >> sbatch/CUNA$*
