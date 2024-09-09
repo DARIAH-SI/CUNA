@@ -155,7 +155,7 @@ class SpeechToText:
             text = span["text"]
             speaker = ""
             if "speaker" in span:
-              speaker=f"[{span['speaker']}:]"
+              speaker=f"[{span['speaker']}]"
             file.write(f"{start_time}\t{end_time}\t{speaker}{text}\n")
         else:
           self.__save_to_tsv(result[key], level , file)
