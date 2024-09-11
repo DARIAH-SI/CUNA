@@ -44,7 +44,7 @@ audio-compile-host11 audio-compile-host12:  audio-compile-host%: $(DATADIR)audio
 
 audio-crop-rename: $(DATADIR)audio-crop-rename.tsv
 	for f in $(DATADIR)audio-source/*.m4a; do ffmpeg -i "$$f" -ar 44100 "$${f/%m4a/WAV}"; done
-	grep "^1" $< | sed "s/\.m4a/\.WAV/"| sed "s@1\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\).*@sox $(DATADIR)/audio-source/\1 $(DATADIR)/audio/\3 trim \4 \=\5@"
+	grep "^1" $< | sed "s/\.m4a/\.WAV/"| sed "s@1\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\).*@sox $(DATADIR)/audio-source/\1 $(DATADIR)/audio-preprocessed/\3 trim \4 \=\5@"
 
 
 audio-modify-orig: $(DATADIR)audio-silent-beep-orig.tsv # add silents and beeps
@@ -60,7 +60,7 @@ audio-modify-cropped: $(DATADIR)audio-crop-beep-cropped.tsv # add silents and be
 	grep -P "^[^\t]*\t0\t-1" $< \
 	  | sort -r -k4 \
 	  | nl -n rz \
-	  | sed "s@\([0-9]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\).*@cp $(DATADIR)/audio/\2 $(DATADIR)/audio/cB\1.\2 \;\n sox $(DATADIR)/audio/\2 $(DATADIR)/audio/part1.\2 trim 0 =\5 \;\n sox $(DATADIR)/audio/\2 $(DATADIR)/audio/part2.\2 trim \6 \;\n sox $(DATADIR)/audio/part1.\2 $(DATADIR)/audio/part2.\2 $(DATADIR)/audio/\2 \n@"
+	  | sed "s@\([0-9]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\)\t\([^\t]*\).*@cp $(DATADIR)/audio-preprocessed/\2 $(DATADIR)/audio-preprocessed/cB\1.\2 \;\n sox $(DATADIR)/audio-preprocessed/\2 $(DATADIR)/audio-preprocessed/part1.\2 trim 0 =\5 \;\n sox $(DATADIR)/audio-preprocessed/\2 $(DATADIR)/audio-preprocessed/part2.\2 trim \6 \;\n sox $(DATADIR)/audio-preprocessed/part1.\2 $(DATADIR)/audio-preprocessed/part2.\2 $(DATADIR)/audio-preprocessed/\2 \n@"
 
 
 
@@ -87,8 +87,8 @@ recognize-NN = $(addprefix recognize-, $(DOC_IDS))
 recognize: $(recognize-NN)
 $(recognize-NN): recognize-%: $(DATADIR)/recognize-working/CUNA_%
 	mkdir -p "$(DATADIR)/recognize-working/" || :
-	test -f $(DATADIR)/audio/CUNA_$*.guest.wav && make recognize-double-$* || :
-	test -f $(DATADIR)/audio/CUNA_$*.wav && make recognize-single-$* || :
+	test -f $(DATADIR)/audio-preprocessed/CUNA_$*.guest.wav && make recognize-double-$* || :
+	test -f $(DATADIR)/audio-preprocessed/CUNA_$*.wav && make recognize-single-$* || :
 	mkdir -p "$(DATADIR)/recognize/"
 	cat "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.whisper.segments.tsv" \
 	  | sed '1 s@\(.*\t\)@\1<uk host topic000 text>@' > $(DATADIR)/recognize/CUNA_$*.tsv
@@ -102,7 +102,7 @@ $(recognize-dir-NN): %:
 recognize-single_NN = $(addprefix recognize-single-, $(DOC_IDS))
 $(recognize-single_NN): recognize-single-%:
 	echo "INFO $*: recognize without annotating speaker"
-	ln -s "../../audio/CUNA_$*.wav" "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.wav"
+	ln -s "../../audio-preprocessed/CUNA_$*.wav" "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.wav"
 	$(BIN)/python ./scripts/asr.py --dir "$(DATADIR)/recognize-working/CUNA_$*" \
 	                               --speaker CUNA_$* \
 	                               --model_size "$(MODEL_SIZE)"  \
@@ -114,7 +114,7 @@ $(recognize-single_NN): recognize-single-%:
 recognize-double_NN = $(addprefix recognize-double-, $(DOC_IDS))
 $(recognize-double_NN): recognize-double-%:
 	echo "INFO $*: recognize host and guest and merge result"
-	for t in 'host' 'guest'; do ln -s "../../audio/CUNA_$*.$${t}.wav" "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.$${t}.wav" ; done
+	for t in 'host' 'guest'; do ln -s "../../audio-preprocessed/CUNA_$*.$${t}.wav" "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.$${t}.wav" ; done
 	$(BIN)/python ./scripts/asr.py --dir "$(DATADIR)/recognize-working/CUNA_$*" \
 	                               --host CUNA_$*.host  \
 	                               --guest CUNA_$*.guest  \
@@ -165,16 +165,76 @@ dev-asr-wav2vec:
 
 ######### AUDIO MERGE (host+guest channels)
 audio-merge:
-	for f in $(DATADIR)audio/CUNA_???.wav; do cp "$${f}" "$(DATADIR)audio-final/$${f##*/}"; done
-	for f in $(DATADIR)audio/CUNA_???.guest.wav; do sox -m "$${f}" "$${f/%guest.wav/host.wav}"  "$(DATADIR)audio-final/$${f##*/}"; done
-	rename "s/\.guest//" $(DATADIR)audio-final/*.guest.wav
+	for f in $(DATADIR)audio-preprocessed/CUNA_???.wav; do cp "$${f}" "$(DATADIR)audio-merged/$${f##*/}"; done
+	for f in $(DATADIR)audio-preprocessed/CUNA_???.guest.wav; do sox -m "$${f}" "$${f/%guest.wav/host.wav}"  "$(DATADIR)audio-merged/$${f##*/}"; done
+	rename "s/\.guest//" $(DATADIR)audio-merged/*.guest.wav
 ######### TRANSCRIPTION PROCESSING
 ## do manual transcription fixings + annotate languages and speakers
+
+transcript-fix-prepare-NN = $(addprefix transcript-fix-prepare-, $(DOC_IDS))
+
+transcript-fix-prepare: $(transcript-fix-prepare-NN)
+$(transcript-fix-prepare-NN): transcript-fix-prepare-%: $(DATADIR)/transcript-fix-input/CUNA_%
+	cat $(DATADIR)/recognize/CUNA_$*.tsv \
+	  | sed 's/\t/000000\t/g' \
+	  | sed -e 's/\(\.[0-9][0-9][0-9][0-9][0-9][0-9]\)0*\t/\1\t/g' \
+	  > $(DATADIR)/transcript-fix-input/CUNA_$*/CUNA_$*.txt
+	touch $(DATADIR)/transcript-fix-input/CUNA_$*/CUNA_$*-audio.txt
+	lame -b 64 $(DATADIR)/audio-merged/CUNA_$*.wav $(DATADIR)/transcript-fix-input/CUNA_$*/CUNA_$*.mp3
+
+
+transcript-fix-in-dir-NN = $(addprefix $(DATADIR)/transcript-fix-input/CUNA_, $(DOC_IDS))
+
+$(transcript-fix-in-dir-NN): %:
+	mkdir -p $*
+
+## transcript-validate - check if transcriptions are in correct format
+
+transcript-validate-NN = $(addprefix transcript-validate-, $(DOC_IDS))
+transcript-validate: $(transcript-validate-NN)
+$(transcript-validate-NN): transcript-validate-%: $(DATADIR)/transcript-fix-output/CUNA_%
+	@echo "INFO: validating transcription $*"
+	cat $</CUNA_$*.txt | grep -Pv '^$$'|grep -Pv '^[0-9]+\.[0-9]+\t[0-9]+\.[0-9]+\t[^\t]+$$' && echo "ERROR: $* invalid tab format" || :
+	nl -n ln $</CUNA_$*.txt | sed -n 's/\t.*\t/\t/p' | perl -pe 's/([\t\>\]])[^\[\<\]\>\n]*?([^\[\<\]\>\n ])[^\[\<\]\>\n]*/\1\2/g' \
+	  | perl -pe 's/([\t\>\]])[^\t\>\]\<\[]/\1#/g' > $<.tmp
+	cat $<.tmp | sed -ne 's/^\([0-9]*\)\t[^#]*$$/\1/p' > $<.tmp.line-no-text
+	cat $<.tmp | grep -P '#.*[\<\[][a-z0-9 ]*(host|guest|topic[0-9]*)' | sed -e 's/\t.*$$//' > $<.tmp.line-inside-sentence
+	cat $<.tmp | grep -Pv '[0-9]*\t(#|<[a-z0-9 ]*>|\[[a-z0-9 ]*\])*$$' | sed -e 's/\t.*$$//' > $<.tmp.line-format
+	LINES=`cat $<.tmp.line-*|sort|uniq|sed "s/$$/p\;/"|tr -d "\n"` ;nl -n ln  $</CUNA_$*.txt | sed "$${LINES}d"|sed 's/^/ERROR in $* on line /'
+	cat $<.tmp | grep -Po '[\<\[][a-z0-9 ]*[\]\>]'|tr -d '[]<>'|tr ' ' '\n'|sort|uniq|grep -vP '^(host|guest|topic\d\d\d|beep|text|uk|ru|sl|en)$$' >  $<.tmp.unknown-cat
+	CAT=`cat $<.tmp.unknown-cat|sed "s/^\(..*\)$$/\/\1\/p\;/"|tr -d "\n"` ;nl -n ln $</CUNA_$*.txt | sed -n "$${CAT}"|sed 's/^/ERROR CATEGORY in $* on line /'
+	echo "INFO: " `cat $<.tmp.* | wc -l` " errors in $*"
+	rm $<.tmp*
+
+
+
+
+## transcript-and-postprocess fix audio and shift timestamps
+
+transcript-and-audio-postprocess-NN = $(addprefix transcript-and-audio-postprocess-, $(DOC_IDS))
+transcript-and-audio-postprocess: $(transcript-and-audio-postprocess-NN)
+$(transcript-and-audio-postprocess-NN): transcript-and-audio-postprocess-%: transcript-postprocess-% audio-postprocess-%
+
+transcript-postprocess-NN = $(addprefix transcript-postprocess-, $(DOC_IDS))
+transcript-postprocess: $(transcript-postprocess-NN)
+$(transcript-postprocess-NN): transcript-postprocess-%:
+	echo "INFO: shifting times in % transcription"
+	echo "TODO $@"
+
+audio-postprocess-NN = $(addprefix audio-postprocess-, $(DOC_IDS))
+audio-postprocess: $(audio-postprocess-NN)
+$(audio-postprocess-NN): audio-postprocess-%:
+	echo "INFO: adding beeps to % audio"
+	echo "INFO: shifting times in % audio"
+	echo "TODO $@"
+
 ## convert to TEI
+
 ## annotate with UDPipe and NameTag
-## insert timestamps from original asr transcription
 
+## finalize TEI format - make corpus, add taxonomies, fill metadata
 
+## convert to derived formats
 
 
 ######### SETUP
