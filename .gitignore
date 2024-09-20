@@ -1,0 +1,6 @@
+.cache
+_*
+tmp*
+data
+virtualenv
+*.log
