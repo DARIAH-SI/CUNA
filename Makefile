@@ -87,8 +87,8 @@ recognize-NN = $(addprefix recognize-, $(DOC_IDS))
 recognize: $(recognize-NN)
 $(recognize-NN): recognize-%: $(DATADIR)/recognize-working/CUNA_%
 	mkdir -p "$(DATADIR)/recognize-working/" || :
-	test -f $(DATADIR)/audio-preprocessed/CUNA_$*.guest.wav && make recognize-double-$* || :
-	test -f $(DATADIR)/audio-preprocessed/CUNA_$*.wav && make recognize-single-$* || :
+	## test -f $(DATADIR)/audio-preprocessed/CUNA_$*.guest.wav && make recognize-double-$* || :
+	test -f $(DATADIR)/audio-final/CUNA_$*.wav && make recognize-single-$* || :
 	mkdir -p "$(DATADIR)/recognize/"
 	cat "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.whisper.segments.tsv" \
 	  | sed '1 s@\(.*\t\)@\1<uk host topic000 text>@' > $(DATADIR)/recognize/CUNA_$*.tsv
@@ -102,7 +102,7 @@ $(recognize-dir-NN): %:
 recognize-single_NN = $(addprefix recognize-single-, $(DOC_IDS))
 $(recognize-single_NN): recognize-single-%:
 	echo "INFO $*: recognize without annotating speaker"
-	ln -s "../../audio-preprocessed/CUNA_$*.wav" "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.wav"
+	ln -s "../../audio-final/CUNA_$*.wav" "$(DATADIR)/recognize-working/CUNA_$*/CUNA_$*.wav"
 	$(BIN)/python ./scripts/asr.py --dir "$(DATADIR)/recognize-working/CUNA_$*" \
 	                               --speaker CUNA_$* \
 	                               --model_size "$(MODEL_SIZE)"  \
