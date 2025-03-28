@@ -188,21 +188,48 @@ transcript-fix-in-dir-NN = $(addprefix $(DATADIR)/transcript-fix-input/CUNA_, $(
 $(transcript-fix-in-dir-NN): %:
 	mkdir -p $*
 
+## place manually processed files to transcript-fix-output
+transcript-fix-out-dir-NN = $(addprefix $(DATADIR)/transcript-fix-output/CUNA_, $(DOC_IDS))
+
+
+
+
+
+## fix manually processed files and split them to audio and text annotations
+transcript-dir-NN = $(addprefix $(DATADIR)/transcript/CUNA_, $(DOC_IDS))
+
+$(transcript-dir-NN): %:
+	mkdir -p $*
+
+patch-transcript-fix-output-NN = $(addprefix patch-transcript-fix-output-, $(DOC_IDS))
+patch-transcript-fix-output: $(patch-transcript-fix-output-NN)
+$(patch-transcript-fix-output-NN): patch-transcript-fix-output-%: $(DATADIR)/transcript/CUNA_%
+	@echo "INFO: patching $*"
+	cat $(DATADIR)/transcript-fix-output/CUNA_$*/*.txt \
+	  | perl -pe 's/\t */\t/g;s/topic (\d\d\d)/topic\1/g;s/topic0([^\d])/topic000\1/;s/  +/ /g' \
+	  >  $(DATADIR)/transcript/CUNA_$*/CUNA_$*.txt
+	cat $(DATADIR)/transcript/CUNA_$*/CUNA_$*.txt | grep -P '\tbeep|crop$$' > $(DATADIR)/transcript/CUNA_$*/CUNA_$*-audio.txt
+	cat $(DATADIR)/transcript/CUNA_$*/CUNA_$*.txt | grep -Pv '\tbeep|crop$$' > $(DATADIR)/transcript/CUNA_$*/CUNA_$*-text.txt
+
+
+
 ## transcript-validate - check if transcriptions are in correct format
 
 transcript-validate-NN = $(addprefix transcript-validate-, $(DOC_IDS))
 transcript-validate: $(transcript-validate-NN)
-$(transcript-validate-NN): transcript-validate-%: $(DATADIR)/transcript-fix-output/CUNA_%
+$(transcript-validate-NN): transcript-validate-%: $(DATADIR)/transcript/CUNA_%
 	@echo "INFO: validating transcription $*"
 	cat $</CUNA_$*.txt | grep -Pv '^$$'|grep -Pv '^[0-9]+\.[0-9]+\t[0-9]+\.[0-9]+\t[^\t]+$$' && echo "ERROR: $* invalid tab format" || :
-	nl -n ln $</CUNA_$*.txt | sed -n 's/\t.*\t/\t/p' | perl -pe 's/([\t\>\]])[^\[\<\]\>\n]*?([^\[\<\]\>\n ])[^\[\<\]\>\n]*/\1\2/g' \
+	nl -n ln $</CUNA_$*.txt | sed -n 's/ *\t.*\t/\t/p' | perl -pe 's/([\t\>\]])[^\[\<\]\>\n]*?([^\[\<\]\>\n ])[^\[\<\]\>\n]*/\1\2/g' \
 	  | perl -pe 's/([\t\>\]])[^\t\>\]\<\[]/\1#/g' > $<.tmp
 	cat $<.tmp | sed -ne 's/^\([0-9]*\)\t[^#]*$$/\1/p' > $<.tmp.line-no-text
 	cat $<.tmp | grep -P '#.*[\<\[][a-z0-9 ]*(host|guest|topic[0-9]*)' | sed -e 's/\t.*$$//' > $<.tmp.line-inside-sentence
 	cat $<.tmp | grep -Pv '[0-9]*\t(#|<[a-z0-9 ]*>|\[[a-z0-9 ]*\])*$$' | sed -e 's/\t.*$$//' > $<.tmp.line-format
+	cat $<.tmp | grep -P '[0-9]*\t(#<.*topic\d\d\d.*>|#\[.*topic\d\d\d.*\])' | sed -e 's/\t.*$$//' > $<.tmp.line-middle-topic-change
 	LINES=`cat $<.tmp.line-*|sort|uniq|sed "s/$$/p\;/"|tr -d "\n"` ;nl -n ln  $</CUNA_$*.txt | sed "$${LINES}d"|sed 's/^/ERROR in $* on line /'
-	cat $<.tmp | grep -Po '[\<\[][a-z0-9 ]*[\]\>]'|tr -d '[]<>'|tr ' ' '\n'|sort|uniq|grep -vP '^(host|guest|topic\d\d\d|beep|text|uk|ru|sl|en)$$' >  $<.tmp.unknown-cat
-	CAT=`cat $<.tmp.unknown-cat|sed "s/^\(..*\)$$/\/\1\/p\;/"|tr -d "\n"` ;nl -n ln $</CUNA_$*.txt | sed -n "$${CAT}"|sed 's/^/ERROR CATEGORY in $* on line /'
+	cat $<.tmp | grep -Po '[\<\[][a-z0-9 ]*[\]\>]'|tr -d '[]<>'|tr ' ' '\n'|sort|uniq|grep -vP '^(host|guest|topic\d\d\d|beep|text|uk|ru|crh|sl|en|fr)$$' >  $<.tmp.unknown-cat
+	CAT=`cat $<.tmp.unknown-cat|sed -n "s/^\(..*\)$$/\/[^a-z0-9]\1[^a-z0-9]\/p\;/p"|tr -d "\n"` ;\
+	  nl -n ln $</CUNA_$*.txt | sed -n "$${CAT}"|sed 's/^/ERROR CATEGORY in $* on line /'
 	echo "INFO: " `cat $<.tmp.* | wc -l` " errors in $*"
 	rm $<.tmp*
 
@@ -229,6 +256,7 @@ $(audio-postprocess-NN): audio-postprocess-%:
 	echo "TODO $@"
 
 ## convert to TEI
+
 
 ## annotate with UDPipe and NameTag
 
