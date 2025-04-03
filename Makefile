@@ -251,16 +251,26 @@ $(transcript-postprocess-NN): transcript-postprocess-%:
 audio-postprocess-NN = $(addprefix audio-postprocess-, $(DOC_IDS))
 audio-postprocess: $(audio-postprocess-NN)
 $(audio-postprocess-NN): audio-postprocess-%:
-	echo "INFO: adding beeps to % audio"
 	echo "INFO: shifting times in % audio"
 	echo "TODO $@"
 
 ## convert to TEI
 
+transcript-to-TEI-NN = $(addprefix transcript-to-TEI-, $(DOC_IDS))
+transcript-to-TEI: $(transcript-to-TEI-NN)
+$(transcript-to-TEI-NN): transcript-to-TEI-%:
+	echo "TODO $@"
+	perl scripts/transcript2tei.pl --id CUNA_$* --in $(DATADIR)/transcript/CUNA_$*/CUNA_$*-text.txt --out $(DATADIR)/tei-like/CUNA_$*.xml
+
 
 ## annotate with UDPipe and NameTag
 
-## finalize TEI format - make corpus, add taxonomies, fill metadata
+## anonymize text and audio (add beeps to audio and remove lemma and form from tokens that should be anonymized)
+
+## finalize TEI.ana format - make corpus, add taxonomies, fill metadata
+
+## finalize TEI format - revert it from TEI.ana with anonymization
+
 
 ## convert to derived formats
 
